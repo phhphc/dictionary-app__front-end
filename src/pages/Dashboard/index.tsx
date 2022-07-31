@@ -23,7 +23,7 @@ const Dashboard = () => {
             <WordModal />
 
             <Row>
-                <Col xs={6}>
+                <Col sm={12} md={8} lg={6}>
                     <SearchWordBar />
                 </Col>
             </Row>

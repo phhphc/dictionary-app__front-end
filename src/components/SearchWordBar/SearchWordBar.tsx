@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react'
 import Form from 'react-bootstrap/Form'
 import Button from 'react-bootstrap/Button'
 import ListGroup from 'react-bootstrap/ListGroup'
+import styled from 'styled-components'
 
-import { useAppDispatch, useAppSelector } from 'app/hooks'
+import { useAppDispatch, useAppSelector, useDebounce } from 'app/hooks'
 import { openModal } from 'features/dict/dictSlice'
 import {
     IAutoComplete,
@@ -11,12 +12,11 @@ import {
     lookUpDict,
 } from 'features/dict/dictServices'
 
-import style from './searchWordbar.module.scss'
-
 const SearchWordBar = () => {
     const dispatch = useAppDispatch()
 
     const [searchTerm, setSearchTerm] = useState('')
+    const [isSearching, setIsSearching] = useState(false)
     const [showList, setShowList] = useState(false)
     const [autoCompleteList, setAutoCompleteList] = useState<IAutoComplete[]>(
         []
@@ -24,17 +24,22 @@ const SearchWordBar = () => {
 
     const dict = useAppSelector((state) => state.dict.dict)
 
+    const debouncedSearchTerm = useDebounce(searchTerm, 500)
     useEffect(() => {
-        autoComplete(searchTerm).then(setAutoCompleteList)
-    }, [searchTerm])
+        autoComplete(debouncedSearchTerm).then(setAutoCompleteList)
+    }, [debouncedSearchTerm])
 
     const searchDict = async (word: string) => {
         if (!searchTerm) return
 
-        let _dict = dict.find((d) => d.word === word)
-        if (!_dict) _dict = await lookUpDict(word)
+        setIsSearching(true)
+        let result = dict.find((d) => d.word === word)
+        if (!result) {
+            result = await lookUpDict(word)
+        }
+        setIsSearching(false)
 
-        dispatch(openModal(_dict))
+        dispatch(openModal(result))
     }
 
     const hangleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -47,6 +52,7 @@ const SearchWordBar = () => {
     }
     const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault()
+        setShowList(false)
         searchDict(searchTerm)
     }
     const handleFocus = () => {
@@ -59,11 +65,7 @@ const SearchWordBar = () => {
     }
 
     return (
-        <div
-            className={style.searchBar}
-            onFocus={handleFocus}
-            onBlur={handleBlur}
-        >
+        <SearchBar onFocus={handleFocus} onBlur={handleBlur}>
             <Form className="d-flex" onSubmit={handleSubmit}>
                 <Form.Control
                     type="search"
@@ -73,11 +75,17 @@ const SearchWordBar = () => {
                     value={searchTerm}
                     onChange={hangleChange}
                 />
-                <Button variant="outline-success">Search</Button>
+                <Button variant="outline-success" type="submit">
+                    {isSearching ? (
+                        <div className="spinner-border spinner-border-sm" />
+                    ) : (
+                        'Search'
+                    )}
+                </Button>
             </Form>
 
             {showList && (
-                <div className={style.searchList}>
+                <SearchList>
                     <ListGroup>
                         {autoCompleteList.map(({ word }) => (
                             <ListGroup.Item
@@ -89,10 +97,22 @@ const SearchWordBar = () => {
                             </ListGroup.Item>
                         ))}
                     </ListGroup>
-                </div>
+                </SearchList>
             )}
-        </div>
+        </SearchBar>
     )
 }
 
 export default SearchWordBar
+
+const SearchBar = styled.div({
+    position: 'relative',
+})
+
+const SearchList = styled.div({
+    zIndex: 10,
+    position: 'absolute',
+    transform: 'translateY(100%)',
+    bottom: '-8px',
+    width: '100%',
+})
